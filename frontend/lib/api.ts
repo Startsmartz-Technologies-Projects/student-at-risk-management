@@ -93,6 +93,10 @@ export async function api<T = unknown>(
     if (newAccess) {
       headers.Authorization = `Bearer ${newAccess}`;
       res = await fetch(url, init);
+    } else {
+      // Public endpoints should still work when stale tokens exist in storage.
+      delete headers.Authorization;
+      res = await fetch(url, init);
     }
   }
 

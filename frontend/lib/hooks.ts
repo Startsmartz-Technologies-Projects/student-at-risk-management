@@ -19,7 +19,7 @@ export interface FetchState<T> {
   refetch: () => void;
 }
 
-function useFetch<T>(path: string | null): FetchState<T> {
+function useFetch<T>(path: string | null, options?: { auth?: boolean }): FetchState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(path !== null);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ function useFetch<T>(path: string | null): FetchState<T> {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    api<T>(path)
+    api<T>(path, { auth: options?.auth ?? true })
       .then((d) => {
         if (!cancelled) setData(d);
       })
@@ -46,14 +46,14 @@ function useFetch<T>(path: string | null): FetchState<T> {
     return () => {
       cancelled = true;
     };
-  }, [path, tick]);
+  }, [path, tick, options?.auth]);
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
   return { data, loading, error, refetch };
 }
 
 export function useStudents() {
-  return useFetch<Paginated<Student>>("/students/");
+  return useFetch<Paginated<Student>>("/students/", { auth: false });
 }
 
 export function useRiskAssessments(params?: {
@@ -66,7 +66,7 @@ export function useRiskAssessments(params?: {
   if (params?.isAtRisk !== undefined) qs.set("is_at_risk", String(params.isAtRisk));
   if (params?.page !== undefined) qs.set("page", String(params.page));
   const path = `/risk/assessments/${qs.toString() ? "?" + qs.toString() : ""}`;
-  return useFetch<Paginated<RiskAssessment>>(path);
+  return useFetch<Paginated<RiskAssessment>>(path, { auth: false });
 }
 
 export function useAllRiskAssessments(params?: {
@@ -92,7 +92,9 @@ export function useAllRiskAssessments(params?: {
         let next: string | null = path;
         const all: RiskAssessment[] = [];
         while (next) {
-          const pageResp: Paginated<RiskAssessment> = await api<Paginated<RiskAssessment>>(next);
+          const pageResp: Paginated<RiskAssessment> = await api<Paginated<RiskAssessment>>(next, {
+            auth: false,
+          });
           all.push(...pageResp.results);
           next = pageResp.next;
         }
@@ -117,20 +119,21 @@ export function useRiskSummary(params?: { week?: 4 | 8 }) {
   const qs = new URLSearchParams();
   if (params?.week !== undefined) qs.set("week", String(params.week));
   const path = `/risk/assessments/summary/${qs.toString() ? "?" + qs.toString() : ""}`;
-  return useFetch<RiskSummary>(path);
+  return useFetch<RiskSummary>(path, { auth: false });
 }
 
 export function useNotifications() {
-  return useFetch<Paginated<Notification>>("/notifications/");
+  return useFetch<Paginated<Notification>>("/notifications/", { auth: false });
 }
 
 export function useConsolidatedReport() {
-  return useFetch<ConsolidatedResponse>("/reports/consolidated/");
+  return useFetch<ConsolidatedResponse>("/reports/consolidated/", { auth: false });
 }
 
 export function useStudentReport(studentId: string | null) {
   return useFetch<import("./types").ConsolidatedRow>(
-    studentId ? `/reports/consolidated/${studentId}/` : null
+    studentId ? `/reports/consolidated/${studentId}/` : null,
+    { auth: false }
   );
 }
 
@@ -144,6 +147,7 @@ export function useEvaluateRisk() {
       return await api<{ evaluated: number }>("/risk/evaluate/", {
         method: "POST",
         body: payload,
+        auth: false,
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed";
@@ -175,7 +179,7 @@ export function useUploadStudents() {
         metricsUpdated?: number;
       }>(
         "/students/bulk-upload/",
-        { method: "POST", body: fd }
+        { method: "POST", body: fd, auth: false }
       );
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed";
@@ -189,7 +193,7 @@ export function useUploadStudents() {
 }
 
 export function useSubjects() {
-  return useFetch<Paginated<import("./types").Subject>>("/subjects/");
+  return useFetch<Paginated<import("./types").Subject>>("/subjects/", { auth: false });
 }
 
 export function useUpdateRiskStatus() {
@@ -208,6 +212,7 @@ export function useUpdateRiskStatus() {
           {
             method: "PATCH",
             body: payload,
+            auth: false,
           }
         );
       } catch (e: unknown) {

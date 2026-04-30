@@ -9,6 +9,9 @@ ALLOWED_HOSTS = ["*"]
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,  # noqa: F405
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
+    # Disable throttling in local development to avoid 429 while pages poll/fetch.
+    "DEFAULT_THROTTLE_CLASSES": (),
+    "DEFAULT_THROTTLE_RATES": {},
 }
 
 # Allow the frontend dev server to call the API.

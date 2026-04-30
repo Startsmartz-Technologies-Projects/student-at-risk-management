@@ -3,8 +3,6 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.common.permissions import IsAdminOrCoordinator
-
 from .models import RiskAssessment
 from .selectors import list_assessments
 from .serializers import (
@@ -47,7 +45,6 @@ class RiskAssessmentViewSet(viewsets.ReadOnlyModelViewSet):
         detail=False,
         methods=["post"],
         url_path="evaluate",
-        permission_classes=[IsAdminOrCoordinator],
     )
     def evaluate(self, request):
         ser = EvaluateRiskSerializer(data=request.data)

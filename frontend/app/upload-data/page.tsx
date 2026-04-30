@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/Card";
-import { useUploadStudents } from "@/lib/hooks";
+import { useEvaluateRisk, useUploadStudents } from "@/lib/hooks";
 import {
   CloudUpload,
   Info,
@@ -32,6 +32,7 @@ const fallbackUploads = [
 export default function UploadDataPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { run: upload, loading } = useUploadStudents();
+  const { run: evaluateRisk } = useEvaluateRisk();
   const [uploads, setUploads] = useState(fallbackUploads);
   const [status, setStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -39,6 +40,14 @@ export default function UploadDataPage() {
     try {
       setStatus(null);
       const result = await upload(file);
+      let evalMsg = "";
+      try {
+        const w4 = await evaluateRisk({ week: 4 });
+        const w8 = await evaluateRisk({ week: 8 });
+        evalMsg = ` | Risk evaluated W4/W8: ${w4.evaluated}/${w8.evaluated}`;
+      } catch {
+        evalMsg = " | Upload done, but risk evaluation failed. Run Process Risk manually.";
+      }
       const sizeMb = (file.size / (1024 * 1024)).toFixed(1) + " MB";
       const date = new Date().toLocaleString("en-US", {
         month: "short",
@@ -51,7 +60,8 @@ export default function UploadDataPage() {
           `Upload successful. Students C/U: ${result.created}/${result.updated} | ` +
           `Subjects C/U: ${result.subjectsCreated ?? 0}/${result.subjectsUpdated ?? 0} | ` +
           `Enrollments C: ${result.enrollmentsCreated ?? 0} | ` +
-          `Metrics C/U: ${result.metricsCreated ?? 0}/${result.metricsUpdated ?? 0}`,
+          `Metrics C/U: ${result.metricsCreated ?? 0}/${result.metricsUpdated ?? 0}` +
+          evalMsg,
       });
     } catch (e: unknown) {
       const fallback = "Upload failed. Use .xlsx/.xls (<=10MB) and valid column format.";

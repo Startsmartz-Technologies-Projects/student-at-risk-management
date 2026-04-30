@@ -20,6 +20,7 @@ export default function ProcessRiskPage() {
   const [year, setYear] = useState<number | null>(null);
   const [trimester, setTrimester] = useState<number | null>(null);
   const { run, loading } = useEvaluateRisk();
+  const [errorText, setErrorText] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string>("Choose year/trimester/week and run evaluation.");
 
@@ -44,6 +45,7 @@ export default function ProcessRiskPage() {
 
   async function onProcess() {
     try {
+      setErrorText(null);
       const result = await run({
         week,
         year: year ?? undefined,
@@ -59,8 +61,10 @@ export default function ProcessRiskPage() {
         })
       );
       setStatusMsg(`Processed ${result.evaluated} enrollment(s) for Week ${week}.`);
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Processing failed.";
       setStatusMsg("Processing failed. Please check API/auth and try again.");
+      setErrorText(msg);
     }
   }
 
@@ -167,6 +171,11 @@ export default function ProcessRiskPage() {
                 {statusMsg}
               </div>
             </div>
+            {errorText && (
+              <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                {errorText}
+              </div>
+            )}
           </Card>
 
           <div className="space-y-5">
