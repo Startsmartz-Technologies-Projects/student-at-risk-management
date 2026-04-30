@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: srm
+      POSTGRES_USER: srm
+      POSTGRES_PASSWORD: srm
+    ports: ["5432:5432"]
+    volumes: [pg_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U srm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  web:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://srm:srm@db:5432/srm
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    ports: ["8000:8000"]
+    volumes: [".:/app"]
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://srm:srm@db:5432/srm
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    volumes: [".:/app"]
+    command: celery -A config worker -l info
+
+volumes:
+  pg_data:
