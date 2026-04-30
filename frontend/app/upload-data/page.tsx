@@ -16,8 +16,9 @@ import {
 } from "lucide-react";
 
 const guidelines = [
-  "Ensure student_id is unique",
-  "Columns: student_id, full_name, email, enrolled_at (YYYY-MM-DD)",
+  "Sheet students: student_id, full_name, email, enrolled_at",
+  "Optional sheets: subjects, enrollments, metrics",
+  "Metrics week must be 4 or 8",
   "Accepted formats: .xlsx or .xls",
   "Max file size: 10MB",
 ];
@@ -46,7 +47,11 @@ export default function UploadDataPage() {
       setUploads((prev) => [{ name: file.name, size: sizeMb, date }, ...prev]);
       setStatus({
         type: "success",
-        text: `Upload successful. Created: ${result.created}, Updated: ${result.updated}`,
+        text:
+          `Upload successful. Students C/U: ${result.created}/${result.updated} | ` +
+          `Subjects C/U: ${result.subjectsCreated ?? 0}/${result.subjectsUpdated ?? 0} | ` +
+          `Enrollments C: ${result.enrollmentsCreated ?? 0} | ` +
+          `Metrics C/U: ${result.metricsCreated ?? 0}/${result.metricsUpdated ?? 0}`,
       });
     } catch (e: unknown) {
       const fallback = "Upload failed. Use .xlsx/.xls (<=10MB) and valid column format.";

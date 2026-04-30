@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/Card";
 import Link from "next/link";
-import { useRiskAssessments } from "@/lib/hooks";
+import { useAllRiskAssessments } from "@/lib/hooks";
 import {
   Users,
   AlertTriangle,
@@ -15,45 +15,6 @@ import {
   Download,
   Sparkles,
 } from "lucide-react";
-
-const fallbackStudents = [
-  {
-    id: "asif-iqbal",
-    name: "Asif Iqbal",
-    avatar: "AI",
-    studentId: "20057033",
-    intervention: "Nov 2025",
-    status: "Tier 3",
-    statusClass: "bg-rose-100 text-rose-600",
-  },
-  {
-    id: "mark-vien",
-    name: "Mark Vien",
-    avatar: "MV",
-    studentId: "20057022",
-    intervention: "Nov 2025",
-    status: "Tier 3",
-    statusClass: "bg-rose-100 text-rose-600",
-  },
-  {
-    id: "sarah-lopez",
-    name: "Sarah Lopez",
-    avatar: "SL",
-    studentId: "20057023",
-    intervention: "Oct 2025",
-    status: "Tier 2",
-    statusClass: "bg-amber-100 text-amber-600",
-  },
-  {
-    id: "david-kim",
-    name: "David Kim",
-    avatar: "DK",
-    studentId: "20057051",
-    intervention: "Nov 2025",
-    status: "Tier 1",
-    statusClass: "bg-slate-100 text-slate-600",
-  },
-];
 
 const departments = [
   { name: "Humanities", value: 62, color: "bg-rose-500" },
@@ -81,26 +42,37 @@ function slug(name: string) {
 }
 
 export default function AtRiskStudentsPage() {
-  const PAGE_SIZE = 25; // synced with backend REST_FRAMEWORK.PAGE_SIZE
+  const PAGE_SIZE = 10;
   const [weekFilter, setWeekFilter] = useState<"all" | 4 | 8>("all");
   const [tierFilter, setTierFilter] = useState<"all" | "Tier 1" | "Tier 2" | "Tier 3">("all");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
 
-  const { data } = useRiskAssessments({
+  const { data, loading, error } = useAllRiskAssessments({
     isAtRisk: true,
     week: weekFilter === "all" ? undefined : weekFilter,
-    page,
   });
 
   useEffect(() => {
     setPage(1);
   }, [weekFilter]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [tierFilter, search]);
+
   const students = useMemo(() => {
-    if (!data?.results?.length) return fallbackStudents;
-    const seen = new Set<string>();
+    if (!data?.length) return [];
+    const byStudent = new Map<
+      string,
+      {
+        studentName: string;
+        studentId: string;
+        evaluatedAt: string;
+        maxReasons: number;
+      }
+    >();
     const rows: Array<{
       id: string;
       name: string;
@@ -110,16 +82,35 @@ export default function AtRiskStudentsPage() {
       status: "Tier 1" | "Tier 2" | "Tier 3";
       statusClass: string;
     }> = [];
-    for (const ra of data.results) {
-      if (seen.has(ra.studentId)) continue;
-      seen.add(ra.studentId);
-      const tier = tierFor(ra.reasons);
+    for (const ra of data) {
+      const prev = byStudent.get(ra.studentId);
+      const reasonCount = ra.reasons?.length ?? 0;
+      if (!prev) {
+        byStudent.set(ra.studentId, {
+          studentName: ra.studentName,
+          studentId: ra.studentId,
+          evaluatedAt: ra.evaluatedAt,
+          maxReasons: reasonCount,
+        });
+        continue;
+      }
+      byStudent.set(ra.studentId, {
+        ...prev,
+        evaluatedAt:
+          new Date(ra.evaluatedAt).getTime() > new Date(prev.evaluatedAt).getTime()
+            ? ra.evaluatedAt
+            : prev.evaluatedAt,
+        maxReasons: Math.max(prev.maxReasons, reasonCount),
+      });
+    }
+    for (const s of byStudent.values()) {
+      const tier = tierFor(new Array(s.maxReasons).fill("reason"));
       rows.push({
-        id: slug(ra.studentName),
-        name: ra.studentName,
-        avatar: initials(ra.studentName),
-        studentId: ra.studentId,
-        intervention: new Date(ra.evaluatedAt).toLocaleString("en-US", {
+        id: slug(s.studentName),
+        name: s.studentName,
+        avatar: initials(s.studentName),
+        studentId: s.studentId,
+        intervention: new Date(s.evaluatedAt).toLocaleString("en-US", {
           month: "short",
           year: "numeric",
         }),
@@ -139,6 +130,11 @@ export default function AtRiskStudentsPage() {
     });
   }, [students, tierFilter, search]);
 
+  const pagedStudents = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredStudents.slice(start, start + PAGE_SIZE);
+  }, [filteredStudents, page]);
+
   function exportCsv() {
     const headers = ["Student Name", "Student ID", "Intervention", "Status"];
     const rows = filteredStudents.map((s) => [s.name, s.studentId, s.intervention, s.status]);
@@ -157,11 +153,21 @@ export default function AtRiskStudentsPage() {
     URL.revokeObjectURL(url);
   }
 
-  const totalAtRisk = data?.count ?? 142;
-  const totalPages = Math.max(1, Math.ceil(totalAtRisk / PAGE_SIZE));
-  const tier3 = data?.results.filter((r) => r.reasons.length >= 3).length ?? 28;
-  const tier2 = data?.results.filter((r) => r.reasons.length === 2).length ?? 54;
-  const tier1 = data?.results.filter((r) => r.reasons.length === 1).length ?? 60;
+  const tierCounts = useMemo(() => {
+    const c = { tier1: 0, tier2: 0, tier3: 0 };
+    for (const s of students) {
+      if (s.status === "Tier 3") c.tier3 += 1;
+      else if (s.status === "Tier 2") c.tier2 += 1;
+      else c.tier1 += 1;
+    }
+    return c;
+  }, [students]);
+
+  const totalAtRisk = students.length;
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+  const tier3 = tierCounts.tier3;
+  const tier2 = tierCounts.tier2;
+  const tier1 = tierCounts.tier1;
 
   const stats = [
     {
@@ -220,6 +226,12 @@ export default function AtRiskStudentsPage() {
             Tiered based on academic performance, attendance, and behavioral
             indicators.
           </p>
+          {loading && <p className="mt-2 text-xs font-medium text-blue-600">Loading at-risk students...</p>}
+          {error && (
+            <p className="mt-2 text-xs font-medium text-rose-600">
+              Failed to load at-risk students from API.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -322,7 +334,7 @@ export default function AtRiskStudentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredStudents.map((s) => (
+              {pagedStudents.map((s) => (
                 <tr key={s.id}>
                   <td className="py-4">
                     <div className="flex items-center gap-3">
@@ -360,8 +372,13 @@ export default function AtRiskStudentsPage() {
               ))}
             </tbody>
           </table>
+          {!loading && !error && pagedStudents.length === 0 && (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              No students found for current filters.
+            </div>
+          )}
           <div className="mt-4 text-xs text-slate-400">
-            Showing page {page} of {totalPages} · {filteredStudents.length} rows on this page · {totalAtRisk} total at-risk students
+            Showing page {page} of {totalPages} - {pagedStudents.length} rows on this page - {filteredStudents.length} filtered students
           </div>
           <div className="mt-3 flex items-center justify-end gap-2">
             <button

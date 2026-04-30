@@ -47,9 +47,13 @@ def evaluate_risk(enrollment: Enrollment, week: int) -> RiskAssessment:
     return obj
 
 
-def evaluate_all(week: int) -> int:
+def evaluate_all(week: int, *, year: int | None = None, trimester: int | None = None) -> int:
     """Evaluate every enrollment that has a metric for the given week. Returns count."""
     enrollments = Enrollment.objects.filter(metrics__week=week).distinct()
+    if year is not None:
+        enrollments = enrollments.filter(year=year)
+    if trimester is not None:
+        enrollments = enrollments.filter(trimester=trimester)
     n = 0
     for enr in enrollments:
         evaluate_risk(enr, week)

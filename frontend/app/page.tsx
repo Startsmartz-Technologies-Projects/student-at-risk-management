@@ -13,13 +13,6 @@ import {
   Mail,
 } from "lucide-react";
 
-const fallbackStats = {
-  total: "12,482",
-  atRiskW4: "432",
-  atRiskW8: "218",
-  improved: "184",
-};
-
 const bars = [
   { week: "WK 01", h: 38 },
   { week: "WK 02", h: 56 },
@@ -68,20 +61,20 @@ const activities = [
 ];
 
 export default function DashboardPage() {
-  const { data: report } = useConsolidatedReport();
+  const { data: report, loading, error, refetch } = useConsolidatedReport();
 
-  const total = report ? report.count.toLocaleString() : fallbackStats.total;
+  const total = report ? report.count.toLocaleString() : "0";
   const atRiskW4 = report
     ? report.results.filter((r) => r.subjectsAtRiskW4 > 0).length.toString()
-    : fallbackStats.atRiskW4;
+    : "0";
   const atRiskW8 = report
     ? report.results.filter((r) => r.subjectsAtRiskW8 > 0).length.toString()
-    : fallbackStats.atRiskW8;
+    : "0";
   const improved = report
     ? report.results
         .filter((r) => r.subjectsAtRiskW4 > 0 && r.subjectsAtRiskW8 < r.subjectsAtRiskW4)
         .length.toString()
-    : fallbackStats.improved;
+    : "0";
 
   const stats = [
     {
@@ -128,6 +121,20 @@ export default function DashboardPage() {
           <p className="mt-1 text-sm text-slate-500">
             Real-time risk analytics and student health metrics.
           </p>
+          {loading && (
+            <p className="mt-2 text-xs font-medium text-blue-600">Loading real data...</p>
+          )}
+          {error && (
+            <div className="mt-2 flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              <span>Unable to load dashboard data from API.</span>
+              <button
+                onClick={refetch}
+                className="rounded-md border border-rose-300 px-2 py-1 font-semibold hover:bg-rose-100"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

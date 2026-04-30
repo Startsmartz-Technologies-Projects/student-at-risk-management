@@ -65,6 +65,9 @@ export interface RiskAssessment {
   isAtRisk: boolean;
   reasons: string[];
   evaluatedAt: string;
+  currentStatus: string;
+  stillAtRiskWeek9: boolean | null;
+  week9ReviewedAt: string | null;
   studentName: string;
   studentId: string;
   subjectCode: string;
@@ -100,4 +103,12 @@ export interface ConsolidatedRow {
 export interface ConsolidatedResponse {
   results: ConsolidatedRow[];
   count: number;
+}
+
+export interface RiskSummary {
+  totalAtRiskStudents: number;
+  tier1Students: number;
+  tier2Students: number;
+  tier3Students: number;
+  assessmentRows: number;
 }

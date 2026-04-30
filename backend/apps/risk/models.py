@@ -9,6 +9,9 @@ class RiskAssessment(TimeStampedModel):
     week = models.PositiveSmallIntegerField()
     is_at_risk = models.BooleanField(default=False)
     reasons = models.JSONField(default=list, blank=True)
+    current_status = models.CharField(max_length=64, default="At Risk")
+    still_at_risk_week9 = models.BooleanField(null=True, blank=True)
+    week9_reviewed_at = models.DateTimeField(null=True, blank=True)
     evaluated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

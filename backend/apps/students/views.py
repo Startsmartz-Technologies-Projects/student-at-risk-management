@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.serializers import ValidationError
 from rest_framework.response import Response
 
 from .models import Enrollment, Student, Subject
@@ -33,7 +34,10 @@ class StudentViewSet(viewsets.ModelViewSet):
     def bulk_upload(self, request):
         ser = BulkUploadSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        result = bulk_upload_students(ser.validated_data["file"].read())
+        try:
+            result = bulk_upload_students(ser.validated_data["file"].read())
+        except ValueError as exc:
+            raise ValidationError({"file": [str(exc)]}) from exc
         return Response(result)
 
 

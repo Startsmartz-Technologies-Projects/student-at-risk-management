@@ -7,37 +7,6 @@ import { Card } from "@/components/Card";
 import { useNotifications } from "@/lib/hooks";
 import { Calendar } from "lucide-react";
 
-const fallbackBroadcasts = [
-  {
-    subject: "Low Attendance",
-    group: "All At-Risk (Tier 1)",
-    date: "Dec 2025",
-    status: "SENT",
-    statusClass: "bg-emerald-50 text-emerald-600",
-  },
-  {
-    subject: "Low Tutorial Submission",
-    group: "All At-Risk Students",
-    date: "Nov 2025",
-    status: "SENT",
-    statusClass: "bg-emerald-50 text-emerald-600",
-  },
-  {
-    subject: "Missed Assignment",
-    group: "All At-Risk (Tier 2)",
-    date: "Nov 2025",
-    status: "SENT",
-    statusClass: "bg-emerald-50 text-emerald-600",
-  },
-  {
-    subject: "Follow-up Improvement Notification",
-    group: "Previously At-Risk",
-    date: "Jan 2026",
-    status: "SENT",
-    statusClass: "bg-emerald-50 text-emerald-600",
-  },
-];
-
 const scheduled = [
   {
     title: "Low Attendance Alert",
@@ -63,10 +32,10 @@ function statusClassFor(status: string) {
 }
 
 export default function NotificationsPage() {
-  const { data } = useNotifications();
+  const { data, loading, error } = useNotifications();
 
   const broadcasts = useMemo(() => {
-    if (!data?.results?.length) return fallbackBroadcasts;
+    if (!data?.results?.length) return [];
     return data.results.slice(0, 8).map((n) => ({
       subject: (n.message.split("\n").find((l) => l.trim().length > 0) || "Notification").slice(
         0,
@@ -90,6 +59,8 @@ export default function NotificationsPage() {
           <p className="mt-1 text-sm text-slate-500">
             Manage automated alerts and systemic communications.
           </p>
+          {loading && <p className="mt-2 text-xs font-medium text-blue-600">Loading notifications...</p>}
+          {error && <p className="mt-2 text-xs font-medium text-rose-600">Failed to load notifications.</p>}
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -136,6 +107,11 @@ export default function NotificationsPage() {
                 ))}
               </tbody>
             </table>
+            {!loading && !error && broadcasts.length === 0 && (
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                No notification records found.
+              </div>
+            )}
 
             <div className="mt-4 text-xs text-slate-400">
               Showing {broadcasts.length} notifications
