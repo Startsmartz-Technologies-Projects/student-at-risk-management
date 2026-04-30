@@ -2,66 +2,19 @@
 
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/Card";
-import { useConsolidatedReport } from "@/lib/hooks";
+import { useAllRiskAssessments, useConsolidatedReport, useNotifications } from "@/lib/hooks";
 import {
   Users,
   TrendingUp,
   AlertTriangle,
   Sparkles,
-  FileText,
-  Activity,
   Mail,
 } from "lucide-react";
 
-const bars = [
-  { week: "WK 01", h: 38 },
-  { week: "WK 02", h: 56 },
-  { week: "WK 03", h: 70 },
-  { week: "WK 04", h: 62 },
-  { week: "WK 05", h: 78 },
-  { week: "WK 06", h: 92 },
-  { week: "WK 07", h: 68 },
-  { week: "WK 08", h: 56 },
-  { week: "WK 09", h: 44 },
-  { week: "WK 10", h: 34 },
-];
-
-const subjects = [
-  { name: "Computer Science", value: 24, color: "bg-blue-500" },
-  { name: "Mathematics", value: 18, color: "bg-teal-500" },
-  { name: "Literature & Arts", value: 32, color: "bg-amber-400" },
-  { name: "Natural Sciences", value: 12, color: "bg-violet-500" },
-];
-
-const activities = [
-  {
-    icon: FileText,
-    title: "Last uploaded file",
-    sub: "Fall_Semester_Grades_2023_v2.csv",
-    time: "2 hours ago",
-    badge: "SUCCESS",
-    badgeClass: "text-emerald-600",
-  },
-  {
-    icon: Activity,
-    title: "Last process run",
-    sub: "Week 8 Midterm Predictive Analysis Engine",
-    time: "5 hours ago",
-    badge: "COMPLETED",
-    badgeClass: "text-blue-600",
-  },
-  {
-    icon: Mail,
-    title: "Notifications sent",
-    sub: "432 automated risk warnings dispatched to counselors",
-    time: "Yesterday",
-    badge: "ARCHIVED",
-    badgeClass: "text-slate-500",
-  },
-];
-
 export default function DashboardPage() {
   const { data: report, loading, error, refetch } = useConsolidatedReport();
+  const { data: assessments } = useAllRiskAssessments({ isAtRisk: true });
+  const { data: notifications } = useNotifications();
 
   const total = report ? report.count.toLocaleString() : "0";
   const atRiskW4 = report
@@ -75,6 +28,35 @@ export default function DashboardPage() {
         .filter((r) => r.subjectsAtRiskW4 > 0 && r.subjectsAtRiskW8 < r.subjectsAtRiskW4)
         .length.toString()
     : "0";
+  const atRiskW4Count = Number(atRiskW4);
+  const atRiskW8Count = Number(atRiskW8);
+  const trendBars = [
+    { week: "W4", count: atRiskW4Count, color: "bg-amber-400" },
+    { week: "W8", count: atRiskW8Count, color: "bg-rose-400" },
+  ];
+  const maxTrend = Math.max(1, ...trendBars.map((b) => b.count));
+
+  const subjectBuckets = new Map<string, number>();
+  for (const ra of assessments ?? []) {
+    subjectBuckets.set(ra.subjectName, (subjectBuckets.get(ra.subjectName) ?? 0) + 1);
+  }
+  const subjectRows = Array.from(subjectBuckets.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+  const maxSubject = Math.max(1, ...subjectRows.map((s) => s.count));
+
+  const recentNotifications = (notifications?.results ?? []).slice(0, 3).map((n) => ({
+    title: `Notification to ${n.studentName}`,
+    sub: n.message.slice(0, 70),
+    time: new Date(n.created_at).toLocaleString("en-US", {
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    status: n.status.toUpperCase(),
+  }));
 
   const stats = [
     {
@@ -88,7 +70,7 @@ export default function DashboardPage() {
     {
       label: "At Risk Week 4",
       value: atRiskW4,
-      sub: "12% increase observed",
+      sub: "Students flagged in Week 4",
       icon: TrendingUp,
       color: "from-amber-400 to-amber-500",
       accent: "bg-white/10",
@@ -96,7 +78,7 @@ export default function DashboardPage() {
     {
       label: "At Risk Week 8",
       value: atRiskW8,
-      sub: "Projections decreasing",
+      sub: "Students flagged in Week 8",
       icon: AlertTriangle,
       color: "from-rose-400 to-rose-500",
       accent: "bg-white/10",
@@ -104,7 +86,7 @@ export default function DashboardPage() {
     {
       label: "Improved Students",
       value: improved,
-      sub: "High intervention success",
+      sub: "Improved from Week 4 to Week 8",
       icon: Sparkles,
       color: "from-emerald-500 to-emerald-600",
       accent: "bg-white/10",
@@ -172,44 +154,29 @@ export default function DashboardPage() {
                   Risk Distribution Trend
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Weekly aggregate of student risk levels
+                  Week 4 vs Week 8 at-risk student counts
                 </p>
-              </div>
-              <div className="flex rounded-full bg-slate-100 p-1 text-xs font-semibold">
-                <button className="rounded-full bg-white px-4 py-1 text-slate-700 shadow-sm">
-                  Weekly
-                </button>
-                <button className="rounded-full px-4 py-1 text-slate-500">
-                  Monthly
-                </button>
               </div>
             </div>
 
-            <div className="mt-8 flex h-56 items-end gap-3">
-              {bars.map((b) => {
-                const isPeak = b.h >= 90;
-                const isHigh = b.h >= 70 && !isPeak;
+            <div className="mt-8 flex h-56 items-end gap-6">
+              {trendBars.map((b) => {
                 return (
                   <div
                     key={b.week}
-                    className="flex flex-1 flex-col items-center gap-2"
+                    className="flex h-full flex-1 flex-col items-center justify-end gap-2"
                   >
                     <div
-                      className={`w-full rounded-t-md transition ${
-                        isPeak
-                          ? "bg-brand-600"
-                          : isHigh
-                          ? "bg-brand-400"
-                          : "bg-brand-200"
-                      }`}
-                      style={{ height: `${b.h}%` }}
+                      className={`w-full rounded-t-md transition ${b.color}`}
+                      style={{ height: `${Math.max(18, (b.count / maxTrend) * 180)}px` }}
                     />
+                    <span className="text-xs font-semibold text-slate-700">{b.count}</span>
                   </div>
                 );
               })}
             </div>
             <div className="mt-3 flex gap-3">
-              {bars.map((b) => (
+              {trendBars.map((b) => (
                 <div
                   key={b.week}
                   className="flex flex-1 justify-center text-[10px] font-medium text-slate-400"
@@ -225,29 +192,28 @@ export default function DashboardPage() {
               Subject-wise Risk
             </h3>
             <p className="mt-1 text-xs text-slate-500">
-              Concentration by department
+              At-risk assessment concentration by subject
             </p>
 
             <div className="mt-6 space-y-5">
-              {subjects.map((s) => (
+              {subjectRows.map((s) => (
                 <div key={s.name}>
                   <div className="flex justify-between text-sm">
                     <span className="font-medium text-slate-700">{s.name}</span>
-                    <span className="text-slate-500">{s.value}%</span>
+                    <span className="text-slate-500">{s.count}</span>
                   </div>
                   <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
                     <div
-                      className={`h-full rounded-full ${s.color}`}
-                      style={{ width: `${s.value * 2.5}%` }}
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${Math.max(8, (s.count / maxSubject) * 100)}%` }}
                     />
                   </div>
                 </div>
               ))}
+              {subjectRows.length === 0 && (
+                <div className="text-sm text-slate-500">No at-risk subject data yet.</div>
+              )}
             </div>
-
-            <button className="mt-auto rounded-full border border-brand-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-brand-600 hover:bg-brand-50">
-              Detailed Department Analysis
-            </button>
           </Card>
         </div>
 
@@ -256,15 +222,15 @@ export default function DashboardPage() {
             Recent Activity
           </h3>
           <div className="space-y-3">
-            {activities.map(
-              ({ icon: Icon, title, sub, time, badge, badgeClass }) => (
+            {recentNotifications.map(
+              ({ title, sub, time, status }) => (
                 <Card
-                  key={title}
+                  key={title + time}
                   className="flex items-center justify-between p-4"
                 >
                   <div className="flex items-center gap-4">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                      <Icon size={18} />
+                      <Mail size={18} />
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-slate-800">
@@ -275,14 +241,15 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-slate-500">{time}</div>
-                    <div
-                      className={`text-[10px] font-bold tracking-wider ${badgeClass}`}
-                    >
-                      {badge}
+                    <div className="text-[10px] font-bold tracking-wider text-slate-600">
+                      {status}
                     </div>
                   </div>
                 </Card>
               )
+            )}
+            {recentNotifications.length === 0 && (
+              <Card className="p-4 text-sm text-slate-500">No recent notification activity.</Card>
             )}
           </div>
         </div>
