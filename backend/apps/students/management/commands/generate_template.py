@@ -43,10 +43,15 @@ class Command(BaseCommand):
                 "attendance_pct",
                 "tutorial_submission_pct",
                 "assessment_attempt_pct",
+                "action_taken",
+                "action_date",
+                "action_notes",
+                "still_potentially_at_risk",
+                "final_status",
             ]
         )
-        ws_metrics.append(["S20057001", "MIS602", 3, 2026, 4, 45, 50, 20])
-        ws_metrics.append(["S20057001", "MIS602", 3, 2026, 8, 62, 75, 90])
+        ws_metrics.append(["S20057001", "MIS602", 3, 2026, 4, 45, 50, 20, "Called student", "2026-05-01", "Guardian informed", "", "At Risk"])
+        ws_metrics.append(["S20057001", "MIS602", 3, 2026, 8, 62, 75, 90, "", "", "", "false", "Recovered"])
 
         wb.save(output_path)
         self.stdout.write(self.style.SUCCESS(f"Template generated: {output_path}"))

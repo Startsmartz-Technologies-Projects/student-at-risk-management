@@ -21,6 +21,14 @@ def _build_message(assessment: RiskAssessment) -> str:
     )
 
 
+def _subject_for_week(week: int) -> str:
+    if week == 4:
+        return "Week 4 Warning"
+    if week == 8:
+        return "Week 8 Warning"
+    return "Academic Risk Notification"
+
+
 @transaction.atomic
 def queue_notifications_for_week(week: int) -> int:
     """Queue email notifications for every at-risk assessment for a given week."""
@@ -29,15 +37,18 @@ def queue_notifications_for_week(week: int) -> int:
     )
     n = 0
     for ra in qs:
-        Notification.objects.create(
+        _, created = Notification.objects.get_or_create(
             student=ra.enrollment.student,
             subject=ra.enrollment.subject,
             channel=Notification.Channel.EMAIL,
-            message=_build_message(ra),
             related_assessment=ra,
-            status=Notification.Status.QUEUED,
+            defaults={
+                "message": _build_message(ra),
+                "status": Notification.Status.QUEUED,
+            },
         )
-        n += 1
+        if created:
+            n += 1
     return n
 
 
@@ -45,7 +56,7 @@ def deliver_notification(notification_id: int) -> None:
     n = Notification.objects.select_related("student").get(pk=notification_id)
     try:
         send_mail(
-            subject="Academic Risk Notification",
+            subject=_subject_for_week(n.related_assessment.week) if n.related_assessment else "Academic Risk Notification",
             message=n.message,
             from_email=None,
             recipient_list=[n.student.email],

@@ -7,7 +7,7 @@ from apps.common.permissions import IsAdminOrCoordinator
 from .models import Notification
 from .selectors import list_notifications
 from .serializers import NotificationSerializer, SendNotificationSerializer
-from .services import queue_notifications_for_week
+from .services import deliver_notification, queue_notifications_for_week
 
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -27,5 +27,13 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     def send(self, request):
         ser = SendNotificationSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        n = queue_notifications_for_week(ser.validated_data["week"])
-        return Response({"queued": n})
+        week = ser.validated_data["week"]
+        queued = queue_notifications_for_week(week)
+        # Dispatch every pending queued notification so old/null-assessment queued rows
+        # are not stranded forever in QUEUED state.
+        queued_ids = Notification.objects.filter(
+            status=Notification.Status.QUEUED,
+        ).values_list("id", flat=True)
+        for n_id in queued_ids:
+            deliver_notification(n_id)
+        return Response({"queuedAndDispatched": queued})

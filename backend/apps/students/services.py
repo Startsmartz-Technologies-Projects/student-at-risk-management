@@ -4,11 +4,14 @@ from datetime import date, datetime
 from io import BytesIO
 from typing import Iterable
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils import timezone
 
 from openpyxl import load_workbook
 
 from apps.metrics.models import WeeklyMetric
+from apps.risk.models import ActionLog, RiskAssessment
 
 from .models import Enrollment, Student, Subject
 
@@ -62,6 +65,26 @@ def _parse_date(value: object) -> date:
     if isinstance(value, str):
         return date.fromisoformat(value.strip())
     raise ValueError("Invalid date value. Use YYYY-MM-DD.")
+
+
+def _parse_optional_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in {"", "none", "null", "n/a"}:
+        return None
+    if normalized in {"true", "1", "yes", "y"}:
+        return True
+    if normalized in {"false", "0", "no", "n"}:
+        return False
+    raise ValueError("Invalid boolean value. Use true/false, yes/no, or 1/0.")
+
+
+def _default_action_user():
+    User = get_user_model()
+    return User.objects.filter(is_active=True).order_by("id").first()
 
 
 def _sheet_rows_by_header(ws) -> tuple[dict[str, int], list[tuple]]:
@@ -240,6 +263,49 @@ def bulk_upload_students(file_bytes: bytes) -> dict:
                 metrics_created += 1
             else:
                 metrics_updated += 1
+
+            action_taken_col = met_h.get("action_taken")
+            action_date_col = met_h.get("action_date")
+            notes_col = met_h.get("action_notes")
+            still_col = met_h.get("still_potentially_at_risk")
+            status_col = met_h.get("final_status")
+
+            if any(c is not None for c in [action_taken_col, action_date_col, notes_col, still_col, status_col]):
+                ra, _ = RiskAssessment.objects.get_or_create(
+                    enrollment=enrollment,
+                    week=week,
+                    defaults={"is_at_risk": False, "reasons": []},
+                )
+
+                if status_col is not None:
+                    status_value = row[status_col]
+                    if status_value is not None and str(status_value).strip():
+                        ra.current_status = str(status_value).strip()
+
+                if still_col is not None:
+                    still_value = _parse_optional_bool(row[still_col])
+                    if still_value is not None:
+                        ra.still_at_risk_week9 = still_value
+                        ra.week9_reviewed_at = timezone.now()
+
+                ra.save(update_fields=["current_status", "still_at_risk_week9", "week9_reviewed_at", "updated_at"])
+
+                if action_taken_col is not None and action_date_col is not None:
+                    action_taken = row[action_taken_col]
+                    action_date = row[action_date_col]
+                    if action_taken is not None and str(action_taken).strip() and action_date is not None:
+                        performer = _default_action_user()
+                        if performer is not None:
+                            notes = ""
+                            if notes_col is not None and row[notes_col] is not None:
+                                notes = str(row[notes_col]).strip()
+                            ActionLog.objects.create(
+                                risk_assessment=ra,
+                                action_taken=str(action_taken).strip(),
+                                action_date=_parse_date(action_date),
+                                performed_by=performer,
+                                notes=notes,
+                            )
 
     return {
         "created": students_created,

@@ -1,4 +1,4 @@
-.PHONY: install migrate makemigrations run seed test lint format up down worker
+.PHONY: install migrate makemigrations run seed test lint format up down worker finalize
 
 install:
 	pip install -r requirements/dev.txt
@@ -18,6 +18,9 @@ seed:
 evaluate:
 	python manage.py evaluate_risk --week 4
 	python manage.py evaluate_risk --week 8
+
+finalize:
+	python manage.py finalize_week9
 
 test:
 	pytest -q

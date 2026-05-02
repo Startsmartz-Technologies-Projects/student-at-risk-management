@@ -38,6 +38,10 @@ class ExportXlsxView(APIView):
             "Total Subjects",
             "Risk %",
             "Overall Risk Level",
+            "Action Taken",
+            "Still Potentially At Risk",
+            "Final Status",
+            "Week9 Reviewed At",
         ]
         ws.append(headers)
         for r in rows:
@@ -51,6 +55,10 @@ class ExportXlsxView(APIView):
                     r["totalSubjects"],
                     r["riskPct"],
                     r["overallRiskLevel"],
+                    r["actionTaken"],
+                    r["stillPotentiallyAtRisk"],
+                    r["finalStatus"],
+                    r["week9ReviewedAt"].isoformat() if r["week9ReviewedAt"] else "",
                 ]
             )
 

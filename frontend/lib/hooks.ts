@@ -19,7 +19,10 @@ export interface FetchState<T> {
   refetch: () => void;
 }
 
-function useFetch<T>(path: string | null, options?: { auth?: boolean }): FetchState<T> {
+function useFetch<T>(
+  path: string | null,
+  options?: { auth?: boolean; refreshMs?: number; refetchOnFocus?: boolean }
+): FetchState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(path !== null);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +50,23 @@ function useFetch<T>(path: string | null, options?: { auth?: boolean }): FetchSt
       cancelled = true;
     };
   }, [path, tick, options?.auth]);
+
+  useEffect(() => {
+    if (!options?.refreshMs || path === null) return;
+    const id = window.setInterval(() => setTick((t) => t + 1), options.refreshMs);
+    return () => window.clearInterval(id);
+  }, [options?.refreshMs, path]);
+
+  useEffect(() => {
+    if (!options?.refetchOnFocus || path === null) return;
+    const onFocus = () => setTick((t) => t + 1);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [options?.refetchOnFocus, path]);
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
   return { data, loading, error, refetch };
@@ -122,8 +142,15 @@ export function useRiskSummary(params?: { week?: 4 | 8 }) {
   return useFetch<RiskSummary>(path, { auth: false });
 }
 
-export function useNotifications() {
-  return useFetch<Paginated<Notification>>("/notifications/", { auth: false });
+export function useNotifications(params?: { page?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.page !== undefined) qs.set("page", String(params.page));
+  const path = `/notifications/${qs.toString() ? "?" + qs.toString() : ""}`;
+  return useFetch<Paginated<Notification>>(path, {
+    auth: false,
+    refreshMs: 5000,
+    refetchOnFocus: true,
+  });
 }
 
 export function useConsolidatedReport() {
@@ -225,5 +252,28 @@ export function useUpdateRiskStatus() {
     },
     []
   );
+  return { run, loading, error };
+}
+
+export function useSendNotifications() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = useCallback(async (week: 4 | 8) => {
+    setLoading(true);
+    setError(null);
+    try {
+      return await api<{ queuedAndDispatched: number }>("/notifications/send/", {
+        method: "POST",
+        body: { week },
+        auth: false,
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed";
+      setError(msg);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
   return { run, loading, error };
 }
