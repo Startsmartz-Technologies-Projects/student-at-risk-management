@@ -5,3 +5,6 @@
 __pycache__/
 *.py[cod]
 
+# Claude Code local state
+.claude/settings.local.json
+
