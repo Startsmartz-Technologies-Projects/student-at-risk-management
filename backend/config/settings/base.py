@@ -37,7 +37,7 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
-    "apps.common",
+    "apps.common.apps.CommonConfig",
     "apps.accounts",
     "apps.students",
     "apps.metrics",
